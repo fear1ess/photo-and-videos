@@ -2,30 +2,33 @@
 export PATH="$PATH:$HOME/.local/bin"
 
 # Variabels:
-TARGET_NAME="Practice_Chris_Blake_Matt"  # <-- set target name here
-DATE="20260118"                         # <-- set your target date here (YYYYMMDD)
+DATE="20260131"                         # <-- set your target date here (YYYYMMDD)
+TARGET_NAME="The_Blizzard_Bash_by_Lucky_Shots_Open"  # <-- set target name here
 
 DRY_RUN=false
 # DRY_RUN=true
 
-# RENAME_AND_COPY=true
-TRANSCRIPT=true
-CUT_POINTS=true
+RENAME_AND_COPY=true
+# TRANSCRIPT=true
+# CUT_POINTS=true
 
 DELETE_LRF=true
 DELETE_WAV=true
 
+# Source
 SD_CARD_NAME=DJI
 WORKING_DIR=/Volumes/$SD_CARD_NAME/DCIM/DJI_001
+
+# Destination
 VIDEO_DESTINATION_DIR_NAME="${DATE}_${TARGET_NAME}"  # <-- set destination dir name
-# VIDEO_DESTINATION=/Volumes/T7/PB_Videos/$VIDEO_DESTINATION_DIR_NAME # <-- Full path for destination
-# VIDEO_DESTINATION=/Volumes/Chris_SSD/PV_VIDEOS
+VIDEO_DESTINATION=/Volumes/T7/PB_Videos/$VIDEO_DESTINATION_DIR_NAME # <-- Full path for destination
+# VIDEO_DESTINATION=/Volumes/T7/PB_Videos/20260109_Pure_PB_Minnesota_Open_Mixed_Moneyball # <-- Full path for destination
 
 LOG_FILE="rename_log.txt"
 
-
-
+#######################################################
 ### Script actions:
+#######################################################
 if [[ "$RENAME_AND_COPY" == true ]]; then
   cd $WORKING_DIR || exit
 
@@ -89,7 +92,7 @@ if [[ "$RENAME_AND_COPY" == true ]]; then
 fi
 
 ### For next step tools are required
-command -v whisper >/dev/null 2>&1 || { echo >&2 "Whisper is required but it's not installed. Aborting."; exit 1; }
+# command -v whisper >/dev/null 2>&1 || { echo >&2 "Whisper is required but it's not installed. Aborting."; exit 1; }
 command -v whisperx >/dev/null 2>&1 || { echo >&2 "WhisperX is required but it's not installed. Aborting."; exit 1; }
 command -v ffmpeg >/dev/null 2>&1 || { echo >&2 "ffmpeg is required but it's not installed. Aborting."; exit 1; }
 
@@ -116,23 +119,37 @@ function add_second(){
 }
 # =======================================================
 # Make transcription with whisper and cut points based on it
-list_of_words="cut|beauty|Wow|Whoo|nice|Sweet|point|Mistake|Review"
+list_of_words="cut|beauty|Wow|Whoo|Sweet|point|Mistake|Review"
+common_phrases="Common phrases: Cut the point, rally. Cut the point. Mistake, twoie. Mistake, drive. Review point. Cut the point, Brock. Analyze the point. Body bag"
+
 cd $VIDEO_DESTINATION
 # i=1
 for f in *.MP4 ; do
-  if [[ "$TRANSCRIPT" == true ]] && [[ "$DRY_RUN" != true ]] ; then
+  # Transcription
+  if [[ "$TRANSCRIPT" == true ]] && [[ "$DRY_RUN" != true ]] && [ ! -f "${f%???}srt" ] ; then
     echo "Making transcription with whisper for $f"
     # whisper "$f" --model medium --language English --fp16 False --verbose True --logprob_threshold -2.0 --no_speech_threshold 0.2 --output_format srt
-    whisperx "$f" --model medium --language en --output_format srt --vad_method silero  --compute_type float32 --beam_size 5 --best_of 5  --temperature 0 --initial_prompt "Common phrases: Cut the point, rally. Cut the point. Mistake, twoie. Mistake, drive. Review point. Cut the point, Brock. Analyze the point."
+    PYTHONWARNINGS="ignore"
+    whisperx "$f" --model medium --language en --output_format srt --vad_method silero  --compute_type float32 --beam_size 5 --best_of 5  --temperature 0 --initial_prompt $common_phrases
   fi
 
+  # Cut points
   if [[ "$CUT_POINTS" == true ]] && [[ "$DRY_RUN" != true ]] ; then
     ind=$(echo "$f" | awk -F'[_.]' '{print $(NF-1)}')
     d="cuts_$ind" ; [ ! -d $d ] && mkdir $d
-    # generate timestamp list
-    [ -f ${f%???}cut_timestamps.txt ] && rm ${f%???}cut_timestamps.txt
 
-    sed '/ --> /{N; s/\n/ /; }' "${f%???}srt" | grep -iE "$list_of_words" |grep ' --> ' | awk -F ' --> ' '{print substr($1,0, length($1)-4) ";" substr($2,14, length($2)-0); }' > "${f%???}cut_timestamps.txt"
+    # generate timestamp list
+    if [[ "$TRANSCRIPT" == true ]] ; then
+      echo "Generating cut points from transcription for $f"
+      [ -f ${f%???}cut_timestamps.txt ] && rm ${f%???}cut_timestamps.txt
+      sed '/ --> /{N; s/\n/ /; }' "${f%???}srt" | grep -iE "$list_of_words" |grep ' --> ' | awk -F ' --> ' '{print substr($1,0, length($1)-4) ";" substr($2,14, length($2)-0); }' > "${f%???}cut_timestamps.txt"
+    else
+      echo "Check ${f%???}cut_timestamps.txt"
+      if [ ! -f "${f%???}cut_timestamps.txt" ] ; then
+        echo "No transcription available and no cut timestamps file found. Skipping $f"
+        continue
+      fi
+    fi
 
     # generate cuts from video
     while IFS= read -r line; do
