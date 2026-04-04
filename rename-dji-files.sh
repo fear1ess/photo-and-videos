@@ -2,15 +2,15 @@
 export PATH="$PATH:$HOME/.local/bin"
 
 # Variabels:
-DATE="20260131"                         # <-- set your target date here (YYYYMMDD)
-TARGET_NAME="The_Blizzard_Bash_by_Lucky_Shots_Open"  # <-- set target name here
+DATE="20260403"                         # <-- set your target date here (YYYYMMDD)
+TARGET_NAME="Games_BN_Erik_Alex_Chris"  # <-- set target name here
 
 DRY_RUN=false
 # DRY_RUN=true
 
-RENAME_AND_COPY=true
-# TRANSCRIPT=true
-# CUT_POINTS=true
+# RENAME_AND_COPY=true
+TRANSCRIPT=true
+CUT_POINTS=true
 
 DELETE_LRF=true
 DELETE_WAV=true
@@ -36,7 +36,7 @@ if [[ "$RENAME_AND_COPY" == true ]]; then
   if [[ "$DELETE_WAV" == true ]] && [[ "$DRY_RUN" != true ]] ; then rm ./*_D.WAV 2>/dev/null ; fi
   if [[ "$DELETE_LRF" == true ]] && [[ "$DRY_RUN" != true ]] ; then rm ./*_D.LRF 2>/dev/null ; fi
 
-  echo -e "\n Directory content: \n"
+  echo -e "\n Content of $WORKING_DIR :\n"
   ls -ltr
 
   echo -e "\n Renaming: \n"
@@ -91,7 +91,9 @@ if [[ "$RENAME_AND_COPY" == true ]]; then
   fi
 fi
 
-### For next step tools are required
+######################################################
+### For next step tools are required to be installed:
+######################################################
 # command -v whisper >/dev/null 2>&1 || { echo >&2 "Whisper is required but it's not installed. Aborting."; exit 1; }
 command -v whisperx >/dev/null 2>&1 || { echo >&2 "WhisperX is required but it's not installed. Aborting."; exit 1; }
 command -v ffmpeg >/dev/null 2>&1 || { echo >&2 "ffmpeg is required but it's not installed. Aborting."; exit 1; }
@@ -119,8 +121,8 @@ function add_second(){
 }
 # =======================================================
 # Make transcription with whisper and cut points based on it
-list_of_words="cut|beauty|Wow|Whoo|Sweet|point|Mistake|Review"
-common_phrases="Common phrases: Cut the point, rally. Cut the point. Mistake, twoie. Mistake, drive. Review point. Cut the point, Brock. Analyze the point. Body bag"
+list_of_words="cut|beauty|Wow|Whoo|Sweet|point|Mistake|Review|highlight"
+common_phrases="Common phrases: highlight. Cut the point, rally. Cut the point. Mistake, twoie. Mistake, drive. Review point. Cut the point, Brock. Analyze the point. Body bag"
 
 cd $VIDEO_DESTINATION
 # i=1
@@ -129,8 +131,8 @@ for f in *.MP4 ; do
   if [[ "$TRANSCRIPT" == true ]] && [[ "$DRY_RUN" != true ]] && [ ! -f "${f%???}srt" ] ; then
     echo "Making transcription with whisper for $f"
     # whisper "$f" --model medium --language English --fp16 False --verbose True --logprob_threshold -2.0 --no_speech_threshold 0.2 --output_format srt
-    PYTHONWARNINGS="ignore"
-    whisperx "$f" --model medium --language en --output_format srt --vad_method silero  --compute_type float32 --beam_size 5 --best_of 5  --temperature 0 --initial_prompt $common_phrases
+    PYTHONWARNINGS="ignore:torchaudio._backend.list_audio_backends has been deprecated:UserWarning" \
+    whisperx "$f" --model medium --language en --output_format srt --vad_method silero --compute_type float32 --beam_size 5 --best_of 5 --temperature 0 --initial_prompt "$common_phrases"
   fi
 
   # Cut points
