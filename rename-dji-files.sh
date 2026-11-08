@@ -2,21 +2,21 @@
 export PATH="$PATH:$HOME/.local/bin"
 
 # Variabels:
-DATE="20260403"                         # <-- set your target date here (YYYYMMDD)
-TARGET_NAME="Games_BN_Erik_Alex_Chris"  # <-- set target name here
+DATE="20261107"                         # <-- set your target date here (YYYYMMDD)
+TARGET_NAME="Minnesota Pure PB Club Fall challenge Mixed 4.5-5.0"  # <-- set target name here
 
 DRY_RUN=false
 # DRY_RUN=true
 
-# RENAME_AND_COPY=true
-TRANSCRIPT=true
-CUT_POINTS=true
+RENAME_AND_COPY=true
+# TRANSCRIPT=true
+# CUT_POINTS=true
 
 DELETE_LRF=true
 DELETE_WAV=true
 
 # Source
-SD_CARD_NAME=DJI
+SD_CARD_NAME=Pocket3
 WORKING_DIR=/Volumes/$SD_CARD_NAME/DCIM/DJI_001
 
 # Destination
@@ -26,17 +26,30 @@ VIDEO_DESTINATION=/Volumes/T7/PB_Videos/$VIDEO_DESTINATION_DIR_NAME # <-- Full p
 
 LOG_FILE="rename_log.txt"
 
+## Functions:
+printf_green() {
+  printf "\033[0;32m%s\033[0m\n" "$1"
+}
+
+printf_red() {
+  printf "\033[0;31m%s\033[0m\n" "$1"
+}
+
+printf_yellow() {
+  printf "\033[0;33m%s\033[0m\n" "$1"
+}
+
 #######################################################
 ### Script actions:
 #######################################################
 if [[ "$RENAME_AND_COPY" == true ]]; then
   cd $WORKING_DIR || exit
 
-  echo -e "\n Clean WAV=$DELETE_WAV and LRF=$DELETE_LRF files \n"
+  printf_green "Cleaning WAV=$DELETE_WAV and LRF=$DELETE_LRF files in '${WORKING_DIR}'..."
   if [[ "$DELETE_WAV" == true ]] && [[ "$DRY_RUN" != true ]] ; then rm ./*_D.WAV 2>/dev/null ; fi
   if [[ "$DELETE_LRF" == true ]] && [[ "$DRY_RUN" != true ]] ; then rm ./*_D.LRF 2>/dev/null ; fi
 
-  echo -e "\n Content of $WORKING_DIR :\n"
+  printf_green "Content of '${WORKING_DIR}' before renaming:"
   ls -ltr
 
   echo -e "\n Renaming: \n"
@@ -59,34 +72,51 @@ if [[ "$RENAME_AND_COPY" == true ]]; then
     # skip non-matching dates
     [[ "$file_date" != "$DATE" ]] && continue
 
+    # Build source file list for disk usage calculation
+    source_file+=("$f")
+
     # Build new filename
     new=$(printf '%s' "$f" | sed -E "s/^DJI_([0-9]{4})[0-9]{10}_0*([0-9]+)_D\.MP4$/\1_${TARGET_NAME}_\2.MP4/")
 
     if [[ "$DRY_RUN" == true ]]; then
-        echo "[DRY RUN] $f --> $new"
+        printf_yellow "[DRY RUN] $f --> $new"
         echo "$(date '+%Y-%m-%d %H:%M:%S') [DRY RUN] $f --> $new" >> "$LOG_FILE"
     else
-        echo "Renaming: $f --> $new"
+        printf_green "Renaming: $f --> $new"
         mv -v -- "$f" "$new"
         echo "$(date '+%Y-%m-%d %H:%M:%S') Renamed: $f --> $new" >> "$LOG_FILE"
         renamed_files+=("$new")
     fi
   done
 
+  # Disk usage of source files
+  if [[ "${#source_file[@]}" -gt 0 ]]; then
+    printf_green "Disk usage of source files:"
+    du -sh "${source_file[@]}" 2>/dev/null || echo "No source files found for disk usage."
+  fi
+
   echo -e "\nLog saved to: $LOG_FILE\n"
 
+  
   if [[ "$DRY_RUN" == true ]]; then
-    echo "[DRY RUN] Would create and move to: $VIDEO_DESTINATION"
+    printf_yellow "[DRY RUN] Would create and move to: $VIDEO_DESTINATION"
     printf '%s\n' "${renamed_files[@]/#/  - }"
     exit 0
   elif [[ "${#renamed_files[@]}" -eq 0 ]]; then
-    echo "No files renamed; nothing to move."
+    printf_red "No files renamed; nothing to move."
   else
     mkdir -p "$VIDEO_DESTINATION"
-    echo -e "\nMoving renamed files to: $VIDEO_DESTINATION\n"
+    echo -e "\nMoving renamed files:\n"
     printf '%s\n' "${renamed_files[@]/#/  - }"
+    echo -e "\nto: $VIDEO_DESTINATION\n"
     # TODO: use rsync for progress bar, and fallback to 'mv' if rsync not available.
-    mv -v -- "${renamed_files[@]}" "$VIDEO_DESTINATION"
+    # printf_green "Moving files to: $VIDEO_DESTINATION"
+    # rsync -av --progress "${renamed_files[@]}" "$VIDEO_DESTINATION/" # - this command brake script
+    for file in "${renamed_files[@]}"; do
+      rsync -avh --progress --stats "$file" "$VIDEO_DESTINATION/"
+    done
+    # mv -v -- "${renamed_files[@]}" "$VIDEO_DESTINATION"
+    ## Log
     echo "$(date '+%Y-%m-%d %H:%M:%S') Moved ${#renamed_files[@]} files to $VIDEO_DESTINATION" >> "$LOG_FILE"
   fi
 fi
@@ -122,7 +152,7 @@ function add_second(){
 # =======================================================
 # Make transcription with whisper and cut points based on it
 list_of_words="cut|beauty|Wow|Whoo|Sweet|point|Mistake|Review|highlight"
-common_phrases="Common phrases: highlight. Cut the point, rally. Cut the point. Mistake, twoie. Mistake, drive. Review point. Cut the point, Brock. Analyze the point. Body bag"
+common_phrases="Common phrases: highlight. Good rally. Cut the point. Mistake, twoie. Mistake. Mistake, drive. Review point. Analyze the point. Body bag. Wow. Set up."
 
 cd $VIDEO_DESTINATION
 # i=1
